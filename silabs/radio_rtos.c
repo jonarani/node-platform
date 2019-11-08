@@ -93,9 +93,9 @@ static comms_error_t radio_stop(comms_layer_iface_t* iface, comms_status_change_
 static comms_error_t radio_send(comms_layer_iface_t *iface, comms_msg_t *msg, comms_send_done_f *send_done, void *user);
 
 static radio_queue_element_t radio_msg_queue_memory[7];
-static volatile radio_queue_element_t* radio_msg_queue_free;
-static volatile radio_queue_element_t* radio_msg_queue_head;
-static volatile radio_queue_element_t* radio_msg_sending;
+static radio_queue_element_t* radio_msg_queue_free;
+static radio_queue_element_t* radio_msg_queue_head;
+static radio_queue_element_t* radio_msg_sending;
 
 osMessageQueueId_t rxQueue;
 osThreadId_t rtid;
@@ -809,7 +809,6 @@ void radio_run() {
 }
 
 static void radio_thread(void *p) {
-	comms_send_done_f *send_done = NULL;
 	osStatus_t oss;
 
 	rtid = osThreadGetId();
@@ -824,7 +823,6 @@ static void radio_thread(void *p) {
 		osMutexAcquire(radio_mutex, osWaitForever);
 
 		if (stop_radio) {
-			uint8_t i = 0;
 			RAIL_RxPacketHandle_t rxh;
 
 			SLEEP_SleepBlockEnd(sleepEM1);
@@ -836,18 +834,22 @@ static void radio_thread(void *p) {
 				stop_radio = false;
 				sleep_ready = false;
 				sleeping = true;
+
+				// Cancel pending TX messages
 				while(radio_msg_queue_head != NULL) {
 					radio_queue_element_t* qe = radio_msg_queue_head;
-					debug1("rmqh");
+					debug1("rmtx");
 					qe->send_done((comms_layer_t *)&radio_iface, qe->msg,
-								COMMS_EOFF, qe->user);
+					              COMMS_EOFF, qe->user);
 
 					radio_msg_queue_head = qe->next;
 					qe->next = radio_msg_queue_free;
 					radio_msg_queue_free = qe;
 				}
+
+				// Discard pending RX messages
 				while (osOK == osMessageQueueGet(rxQueue, &rxh, NULL, 0)) {
-					warn1("msgCnt: %"PRIu8"", ++i);
+					debug1("rmrx");
 					RAIL_Status_t rst = RAIL_ReleaseRxPacket(radio_rail_handle, rxh);
 					if(rst != RAIL_STATUS_NO_ERROR) {
 						warnb1("rst", &rst, sizeof(RAIL_Status_t));
