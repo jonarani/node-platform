@@ -55,8 +55,8 @@ extern const char * g_panic_str;
  */
 #define sys_panic(str)                                      \
 ({                                                          \
-    STATIC_CONST char moduulROM[] PROGMEM = __MODUUL__;     \
-    STATIC_CONST char strROM[] PROGMEM = str;               \
+    STATIC_CONST char moduulROM[] = __MODUUL__;             \
+    STATIC_CONST char strROM[] = str;                       \
         g_panic_file = moduulROM;                           \
         g_panic_line = __LINE__;                            \
         g_panic_str = strROM;                               \
